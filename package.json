@@ -6,7 +6,7 @@
   "scripts": {
     "server:safe": "node server.js",
     "server:unsafe": "node server.js unsafe",
-    "crack:length": "node password-length.js",
+    "crack:length": "node crack-length.js",
     "keygen": "cat < /dev/urandom | head -c 32 | tr -cd '[:alnum:]' > key.txt",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
