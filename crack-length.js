@@ -1,4 +1,4 @@
-const Statistics = require('statistics.js');
+const mathjs = require('mathjs');
 const { makeRequest } = require("./lib/request");
 
 // Guess passwords of length b/w 1 and N
@@ -22,13 +22,11 @@ const REPORT_EVERY_N_OBSERVATIONS = 2 * N_OBSERVATIONS_PER_ROUND * MAX_PWD_LEN;
  */
 function midsummary(observations) {
   const w = 10;
-  const stats = new Statistics([], {});
-  // Have to convert to milliseconds and use Number type
-  // because statistics.js does not work with BigInt
-  const numbers = observations.map(t => Number(t / 1000000n));
-  const l = stats.quantile(numbers, (50 - w)/100);
-  const r = stats.quantile(numbers, (50 + w)/100);
-  return stats.mean([l, r]);
+  // Convert to milliseconds
+  const observationsMs = observations.map(t => Number(t / 1000000n));
+  const l = mathjs.quantileSeq(observationsMs, (50 - w)/100);
+  const r = mathjs.quantileSeq(observationsMs, (50 + w)/100);
+  return mathjs.mean(l, r);
 }
 
 /**
