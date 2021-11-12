@@ -2,7 +2,14 @@
   "name": "node-timing-attack",
   "version": "1.0.0",
   "description": "Demo of API key cracking using a timing attack",
-  "main": "index.js",
+  "author": "Dmitry Shpika",
+  "license": "MIT",
+  "private": true,
+  "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scriptin/node-timing-attack",
+  },
   "scripts": {
     "server:safe": "node server.js",
     "server:unsafe": "node server.js unsafe",
@@ -10,8 +17,6 @@
     "keygen": "cat < /dev/urandom | head -c 32 | tr -cd '[:alnum:]' > key.txt",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.17.1",
     "mathjs": "^10.0.0"
