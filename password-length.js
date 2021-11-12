@@ -1,9 +1,14 @@
 const Statistics = require('statistics.js');
 const { makeRequest } = require("./lib/request");
 
+// Guess passwords of length b/w 1 and N
 const MAX_PWD_LEN = 32;
+
+// How many last observations to use per round
 const N_OBSERVATIONS_PER_ROUND = 20;
-// multiply by some small positive integer (1 < n < 10)
+
+// How many observation to run before reporting.
+// Multiply by some small positive integer (1 < n < 10)
 // to make sure we "warm up" before doing actual measurements.
 // Probably not necessary, but also useful to fully refresh
 // the list of measurements b/w rounds.
@@ -111,38 +116,50 @@ let totalObservations = 0;
  */
 const topPlaces = {};
 
+/**
+ * @param len {number}
+ * @param tDiff {TimeSpan}
+ */
+function updateObservations(len, tDiff) {
+  const currentObservations = observations[len]?.observations ?? [];
+  const currentCount = observations[len]?.count ?? 0;
+  observations[len] = {
+    observations: [tDiff, ...currentObservations].slice(0, N_OBSERVATIONS_PER_ROUND),
+    count: currentCount + 1,
+  };
+  totalObservations += 1;
+}
+
+function report() {
+  const ranking = Object.keys(observations)
+    .map(len => [len, midsummary(observations[len].observations), observations[len].count])
+    .sort((a, b) => compare(a[1], b[1]));
+
+  const [slowestLen] = ranking[0];
+  topPlaces[slowestLen] = (topPlaces[slowestLen] ?? 0) +  1;
+
+  const report = Object.keys(topPlaces)
+    .map(l => [l, topPlaces[l]])
+    .sort((a, b) => b[1] - a[1]) // Descending by total number of top places
+    .slice(0, 5) // report only top 5
+    .map(row => `${row[0].padStart(2, ' ')} was the slowest ${row[1]} time(s)`);
+
+  console.log("\n" + report.join("\n"));
+}
+
 async function guessLength() {
   const randomLen = Math.floor(Math.random() * MAX_PWD_LEN) + 1;
   const dummyKey = '0'.repeat(randomLen);
 
   const [data, tDiff] = await makeRequest(dummyKey);
 
-  const currentObservations = observations[randomLen]?.observations ?? [];
-  const currentCount = observations[randomLen]?.count ?? 0;
-  observations[randomLen] = {
-    observations: [tDiff, ...currentObservations].slice(0, N_OBSERVATIONS_PER_ROUND),
-    count: currentCount + 1,
-  };
-  totalObservations += 1;
+  updateObservations(randomLen, tDiff);
 
   if (totalObservations % REPORT_EVERY_N_OBSERVATIONS === 0) {
-    const top = Object.keys(observations)
-      .map(len => [len, midsummary(observations[len].observations), observations[len].count])
-      .sort((a, b) => compare(a[1], b[1]));
-    const [topLen] = top[0];
-    if (topPlaces[topLen] == null) {
-      topPlaces[topLen] = 0;
-    }
-    topPlaces[topLen] += 1;
-
-    const report = Object.keys(topPlaces).map(l => [l, topPlaces[l]])
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5) // report only top 5
-      .map(row => `${row[0].padStart(2, ' ')} was the slowest ${row[1]} time(s)`)
-      .join("\n");
-    console.log("\n" + report);
+    report();
   }
 
+  // loop with a chance to terminate
   setTimeout(() => guessLength(), 0);
 }
 
