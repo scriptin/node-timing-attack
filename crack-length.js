@@ -15,91 +15,29 @@ const N_OBSERVATIONS_PER_ROUND = 20;
 const REPORT_EVERY_N_OBSERVATIONS = 2 * N_OBSERVATIONS_PER_ROUND * MAX_PWD_LEN;
 
 /**
- * @typedef {[seconds: number, nanoseconds: number]} TimeSpan
- */
-
-/**
- * @param t1 {TimeSpan}
- * @param t2 {TimeSpan}
- * @return {TimeSpan}
- */
-function min(t1, t2) {
-  const [s1, ns1] = t1, [s2, ns2] = t2;
-  if (s1 + s2 === 0 && Math.min(ns1, ns2) === ns1) {
-    return [s1, ns1];
-  }
-  if (s1 + s2 > 0 && Math.min(s1, s2) === s1) {
-    return [s1, ns1];
-  }
-  if (s1 === s2 && Math.min(ns1, ns2) === ns1) {
-    return [s1, ns1];
-  }
-  return [s2, ns2];
-}
-
-/**
- * @param t1 {TimeSpan}
- * @param t2 {TimeSpan}
- * @return {number}
- */
-function compare(t1, t2) {
-  const [s1, ns1] = t1, [s2, ns2] = t2;
-  if (s1 === s2 && ns1 === ns2) {
-    return 0;
-  }
-  const [minS, minNs] = min([s1, ns1], [s2, ns2]);
-  if (minS === s1 && minNs === ns1) {
-    return 1;
-  }
-  if (minS === s2 && minNs === ns2) {
-    return -1;
-  }
-}
-
-/**
- * @param t {TimeSpan}
- * @return {number}
- */
-function timeSpanToNumber(t) {
-  return t[0]*1e9 + t[1];
-}
-
-/**
- * @param n {number}
- * @return {TimeSpan}
- */
-function numberToTimeSpan(n) {
-  const s = Math.trunc(n / 1e9);
-  const ns = Math.trunc(n - s*1e9);
-  return [s, ns];
-}
-
-/**
  * Implements "midsummary" L-estimator from "Web Timing Attacks Made Practical" (Morgan & Morgan, 2015)
  * @see <https://www.blackhat.com/docs/us-15/materials/us-15-Morgan-Web-Timing-Attacks-Made-Practical-wp.pdf>
- * @param ts {TimeSpan[]}
- * @return {TimeSpan}
+ * @param observations {BigInt[]} Array of observed round trip times in nanoseconds
+ * @return {number} Estimated avg. number of milliseconds
  */
-function midsummary(ts) {
+function midsummary(observations) {
   const w = 10;
   const stats = new Statistics([], {});
-  const numbers = ts.map(timeSpanToNumber);
+  // Have to convert to milliseconds and use Number type
+  // because statistics.js does not work with BigInt
+  const numbers = observations.map(t => Number(t / 1000000n));
   const l = stats.quantile(numbers, (50 - w)/100);
   const r = stats.quantile(numbers, (50 + w)/100);
-  const mean = stats.mean([l, r]);
-  return numberToTimeSpan(mean);
+  return stats.mean([l, r]);
 }
 
 /**
- * Observations data, a map from password length to round trip times (RTT)
+ * Experiment data, a map from password length to round trip times (RTT)
  * @type {{
- *   [key: number]: {
- *     observations: TimeSpan[],
- *     count: number,
- *   }
+ *   [key: number]: BigInt[]
  * }}
  */
-const observations = {};
+const experiments = {};
 
 /**
  * Total number of performed observations.
@@ -118,25 +56,22 @@ const topPlaces = {};
 
 /**
  * @param len {number}
- * @param tDiff {TimeSpan}
+ * @param timeDiff {BigInt}
  */
-function updateObservations(len, tDiff) {
-  const currentObservations = observations[len]?.observations ?? [];
-  const currentCount = observations[len]?.count ?? 0;
-  observations[len] = {
-    observations: [tDiff, ...currentObservations].slice(0, N_OBSERVATIONS_PER_ROUND),
-    count: currentCount + 1,
-  };
+function updateObservations(len, timeDiff) {
+  /** @type BigInt[] */
+  const observations = experiments[len] ?? [];
+  experiments[len] = [timeDiff, ...observations].slice(0, N_OBSERVATIONS_PER_ROUND);
   totalObservations += 1;
 }
 
 function report() {
-  const ranking = Object.keys(observations)
-    .map(len => [len, midsummary(observations[len].observations), observations[len].count])
-    .sort((a, b) => compare(a[1], b[1]));
+  const ranking = Object.keys(experiments)
+    .map(len => [len, midsummary(experiments[len])])
+    .sort((a, b) => b[1] - a[1]);
 
   const [slowestLen] = ranking[0];
-  topPlaces[slowestLen] = (topPlaces[slowestLen] ?? 0) +  1;
+  topPlaces[slowestLen] = (topPlaces[slowestLen] ?? 0) + 1;
 
   const report = Object.keys(topPlaces)
     .map(l => [l, topPlaces[l]])
@@ -151,9 +86,9 @@ async function guessLength() {
   const randomLen = Math.floor(Math.random() * MAX_PWD_LEN) + 1;
   const dummyKey = '0'.repeat(randomLen);
 
-  const [data, tDiff] = await makeRequest(dummyKey);
+  const [, timeDiff] = await makeRequest(dummyKey);
 
-  updateObservations(randomLen, tDiff);
+  updateObservations(randomLen, timeDiff);
 
   if (totalObservations % REPORT_EVERY_N_OBSERVATIONS === 0) {
     report();
