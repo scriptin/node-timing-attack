@@ -14,6 +14,7 @@
     "server:safe": "node server.js",
     "server:unsafe": "node server.js unsafe",
     "crack:length": "node crack-length.js",
+    "crack:password": "node crack-password.js",
     "keygen": "cat < /dev/urandom | head -c 32 | tr -cd '[:alnum:]' > key.txt",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

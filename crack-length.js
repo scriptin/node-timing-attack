@@ -1,5 +1,5 @@
-const mathjs = require('mathjs');
 const { makeRequest } = require("./lib/request");
+const { midsummary } = require("./lib/estimator");
 
 // Guess passwords of length b/w 1 and N
 const MAX_PWD_LEN = 32;
@@ -13,21 +13,6 @@ const N_OBSERVATIONS_PER_ROUND = 20;
 // Probably not necessary, but also useful to fully refresh
 // the list of measurements b/w rounds.
 const REPORT_EVERY_N_OBSERVATIONS = 2 * N_OBSERVATIONS_PER_ROUND * MAX_PWD_LEN;
-
-/**
- * Implements "midsummary" L-estimator from "Web Timing Attacks Made Practical" (Morgan & Morgan, 2015)
- * @see <https://www.blackhat.com/docs/us-15/materials/us-15-Morgan-Web-Timing-Attacks-Made-Practical-wp.pdf>
- * @param observations {BigInt[]} Array of observed round trip times in nanoseconds
- * @return {number} Estimated avg. number of milliseconds
- */
-function midsummary(observations) {
-  const w = 10;
-  // Convert to milliseconds
-  const observationsMs = observations.map(t => Number(t / 1000000n));
-  const l = mathjs.quantileSeq(observationsMs, (50 - w)/100);
-  const r = mathjs.quantileSeq(observationsMs, (50 + w)/100);
-  return mathjs.mean(l, r);
-}
 
 /**
  * Experiment data, a map from password length to round trip times (RTT)
