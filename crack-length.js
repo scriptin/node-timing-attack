@@ -1,8 +1,8 @@
 const { makeRequest } = require("./lib/request");
 const { midsummary } = require("./lib/estimator");
 
-// Guess passwords of length b/w 1 and N
-const MAX_PWD_LEN = 32;
+// Guess keys of length b/w 1 and N
+const MAX_KEY_LEN = 32;
 
 // How many last observations to use per round
 const N_OBSERVATIONS_PER_ROUND = 20;
@@ -12,10 +12,10 @@ const N_OBSERVATIONS_PER_ROUND = 20;
 // to make sure we "warm up" before doing actual measurements.
 // Probably not necessary, but also useful to fully refresh
 // the list of measurements b/w rounds.
-const REPORT_EVERY_N_OBSERVATIONS = 2 * N_OBSERVATIONS_PER_ROUND * MAX_PWD_LEN;
+const REPORT_EVERY_N_OBSERVATIONS = 2 * N_OBSERVATIONS_PER_ROUND * MAX_KEY_LEN;
 
 /**
- * Experiment data, a map from password length to round trip times (RTT)
+ * Experiment data, a map from key length to round trip times (RTT)
  * @type {{
  *   [key: number]: BigInt[]
  * }}
@@ -29,7 +29,7 @@ const experiments = {};
 let totalObservations = 0;
 
 /**
- * Counting how many times each password length came out on top,
+ * Counting how many times each key length came out on top,
  * i.e., #1 in the list of longest observations (aggregated via some function)
  * @type {{
  *   [key: number]: number
@@ -66,7 +66,7 @@ function report() {
 }
 
 async function guessLength() {
-  const randomLen = Math.floor(Math.random() * MAX_PWD_LEN) + 1;
+  const randomLen = Math.floor(Math.random() * MAX_KEY_LEN) + 1;
   const dummyKey = '0'.repeat(randomLen);
 
   const [, timeDiff] = await makeRequest(dummyKey);
