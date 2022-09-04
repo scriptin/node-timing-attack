@@ -54,7 +54,7 @@ attack on string comparison. (See benchmarking results at the end.)
 3. Crack key length: `npm run crack:length` - this will print lines like `8 was the slowest X time(s)` repeatedly - the
    number `8` in this case is the most likely length. The algorithm is probabilistic, it does multiple passes to collect
    the data to account for systematic changes in round trip times of HTTP requests
-5. Crack the key itself: `npm run crack:key 8` (`8` is the key length from a previous step) - this will eventually guess
+4. Crack the key itself: `npm run crack:key 8` (`8` is the key length from a previous step) - this will eventually guess
    the key, trying characters one by one.
 
 ### Why it works?
@@ -86,7 +86,7 @@ HTTP request:               593552ns
 ```
 
 Artificially slowed down string comparison works in a similar time compared to HTTP requests in this specific setup, so
-even most simple statistical method would be sufficient to perform this kind of attack.
+even the most simple statistical method would be sufficient to perform this kind of attack.
 
 Normal string comparison operation is 2 orders of magnitude faster than a network request, even on localhost, in the app
 which only checks the key. In a real world scenario, the difference would be 3 or more orders of magnitude. This makes
@@ -112,7 +112,7 @@ Timing attacks are possible when a target operation is slow enough compared to t
 
 ## Limitations of this research
 
-Benchmarking methods I've used are based on `process.hrtime()` method in Node.js v14. The algorithm of running the
+Benchmarking methods I've used are based on the `process.hrtime()` method in Node.js v14. The algorithm of running the
 benchmarks does not account for all important factors, but is sufficient for a simple demonstration.
 
 More sophisticated time measurement techniques could exist which would potentially allow me to perform a successful
