@@ -10,8 +10,11 @@
     "type": "git",
     "url": "https://github.com/scriptin/node-timing-attack"
   },
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "scripts": {
-    "keygen": "cat < /dev/urandom | head -c 32 | tr -cd '[:alnum:]' > key.txt",
+    "keygen": "cat < /dev/urandom | head -c 32 | LC_CTYPE=C tr -cd '[:alnum:]' > key.txt",
     "server:safe": "node server.js",
     "server:unsafe": "node server.js unsafe",
     "crack:length": "node crack-length.js",
